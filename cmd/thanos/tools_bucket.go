@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
+	// "text/template"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -182,6 +182,10 @@ func registerBucketLs(app extkingpin.AppClause, objStoreConfig *extflag.PathOrCo
 	cmd := app.Command("ls", "List all blocks in the bucket")
 	output := cmd.Flag("output", "Optional format in which to print each block's information. Options are 'json', 'wide' or a custom template.").
 		Short('o').Default("").String()
+
+	minTime := cmd.Flag("minTime", "The minimum time range for the blocks in unixtime").Default(strconv.FormatInt(time.Time{}.Unix(), 10)).Int64()
+	maxTime := cmd.Flag("maxTime", "The maximum time range for the blocks in unixtime ").Default(strconv.FormatInt(time.Now().Unix(),10)).Int64()
+
 	cmd.Setup(func(g *run.Group, logger log.Logger, reg *prometheus.Registry, _ opentracing.Tracer, _ <-chan struct{}, _ bool) error {
 		confContentYaml, err := objStoreConfig.Content()
 		if err != nil {
@@ -211,11 +215,12 @@ func registerBucketLs(app extkingpin.AppClause, objStoreConfig *extflag.PathOrCo
 			objects    = 0
 			printBlock func(m *metadata.Meta) error
 		)
-
 		switch format {
 		case "":
 			printBlock = func(m *metadata.Meta) error {
-				fmt.Fprintln(os.Stdout, m.ULID.String())
+				if m.MinTime >= *minTime*1000 && m.MaxTime <= *maxTime*1000 {
+					fmt.Fprintln(os.Stdout, m.ULID.String())
+				}
 				return nil
 			}
 		case "wide":
@@ -238,15 +243,13 @@ func registerBucketLs(app extkingpin.AppClause, objStoreConfig *extflag.PathOrCo
 				return enc.Encode(&m)
 			}
 		default:
-			tmpl, err := template.New("").Parse(format)
-			if err != nil {
-				return errors.Wrap(err, "invalid template")
-			}
 			printBlock = func(m *metadata.Meta) error {
-				if err := tmpl.Execute(os.Stdout, &m); err != nil {
-					return errors.Wrap(err, "execute template")
-				}
-				fmt.Fprintln(os.Stdout, "")
+				//fmt.Fprintln(os.Stdout, m.ULID)
+				//fmt.Fprintln(os.Stdout, "")
+				//fmt.Fprintln(os.Stdout, m.MinTime)
+				//fmt.Fprintln(os.Stdout, "")
+				//fmt.Fprintln(os.Stdout, m.MaxTime)
+				//fmt.Fprintln(os.Stdout, "")
 				return nil
 			}
 		}
